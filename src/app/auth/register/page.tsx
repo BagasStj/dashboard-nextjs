@@ -17,8 +17,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { useRouter } from 'next/navigation'
+import { useToast } from "@/components/ui/use-toast"
 
-// Definisikan schema validasi
+// Define validation schema
 const registerSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
@@ -35,14 +37,47 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 export default function Register() {
     const [showPassword, setShowPassword] = useState(false)
     const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+    const { toast } = useToast()
 
     const { register, handleSubmit, formState: { errors } } = useForm<RegisterFormValues>({
       resolver: zodResolver(registerSchema)
     });
 
-    const onSubmit = (data: RegisterFormValues) => {
-      console.log(data);
-      // Handle form submission here
+    const router = useRouter()
+
+    const onSubmit = async (data: RegisterFormValues) => {
+      try {
+        const response = await fetch('/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          toast({
+            title: "Registration successful!",
+            description: "You can now log in with your new account.",
+            variant: "default",
+          })
+          router.push('/auth/login');
+        } else {
+          toast({
+            title: "Registration failed",
+            description: result.error,
+            variant: "destructive",
+          })
+          console.error('Registration failed:', result.error, result.details);
+        }
+      } catch (error) {
+        toast({
+          title: "An error occurred",
+          description: "Unable to complete registration. Please try again.",
+          variant: "destructive",
+        })
+        console.error('Registration error:', error);
+      }
     };
   
     return (
@@ -125,9 +160,7 @@ export default function Register() {
               <Button type="submit" className="w-full">
                 Create an account
               </Button>
-              <Button type="button" variant="outline" className="w-full">
-                Sign up with GitHub
-              </Button>
+     
             </form>
             <div className="mt-4 text-center text-sm">
               Already have an account?{" "}

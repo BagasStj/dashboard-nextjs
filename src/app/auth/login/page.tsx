@@ -1,12 +1,14 @@
 'use client';
 
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { useRouter } from 'next/navigation';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { signIn, useSession } from "next-auth/react";
+import { useToast } from "@/components/ui/use-toast"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -28,15 +30,57 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function Login() {
     const router = useRouter();
+    const { data: session, status } = useSession();
     const [showPassword, setShowPassword] = useState(false);
-
     const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
         resolver: zodResolver(loginSchema),
     });
+    const { toast } = useToast();
 
-    const onSubmit = (data: LoginFormData) => {
-        // router.push(`/main/profile?email=${encodeURIComponent(data.email)}`);
+    useEffect(() => {
+        if (status === "authenticated") {
+            router.push('/dashboard');
+        }
+    }, [status, router]);
+
+    const onSubmit = async (data: LoginFormData) => {
+        try {
+            const result = await signIn("credentials", {
+                redirect: false,
+                email: data.email,
+                password: data.password,
+            });
+
+            if (result?.error) {
+                if (result.error === "CredentialsSignin") {
+                    toast({
+                        title: "Login Failed",
+                        description: "Invalid email or password",
+                        variant: "destructive",
+                    });
+                } else {
+                    toast({
+                        title: "Login Error",
+                        description: result.error,
+                        variant: "destructive",
+                    });
+                }
+            } else {
+                router.push('/dashboard');
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            toast({
+                title: "Login Error",
+                description: "An error occurred during login",
+                variant: "destructive",
+            });
+        }
     };
+
+    if (status === "loading") {
+        return <div>Loading...</div>;
+    }
 
     return (
         <div className="flex items-center justify-center min-h-screen bg-gray-100">
@@ -88,10 +132,6 @@ export default function Login() {
                         </div>
                         <Button type="submit" className="w-full">
                             Login
-                        </Button>
-                        
-                        <Button type="button" variant="outline" className="w-full">
-                            Login with Google
                         </Button>
                     </form>
                     <div className="mt-4 text-center text-sm">
